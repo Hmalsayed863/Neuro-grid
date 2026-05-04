@@ -1,1 +1,1403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Neuro-grid — Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04040a;
+    --fg: #ffffff;
+    --muted: rgba(255,255,255,0.55);
+    --faint: rgba(255,255,255,0.28);
+    --glass-tint: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.14);
+    --accent-cyan: #5ff0ff;
+    --accent-magenta: #ff4dd2;
+    --accent-red: #ff5577;
+    --accent-violet: #9a7cff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--fg);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  body {
+    /* subtle page-wide vignette over the canvas */
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .tight { letter-spacing: -0.035em; }
+  .tighter { letter-spacing: -0.05em; }
 
+  /* ---------- Background canvas ---------- */
+  #neon-city {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    /* fallback gradient behind canvas in case it fails */
+    background:
+      radial-gradient(ellipse at 50% 60%, rgba(120,40,90,0.25), transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(0,80,120,0.2), transparent 60%),
+      #04040a;
+  }
+  #neon-city::after {
+    /* grain overlay */
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 3px 3px;
+    opacity: 0.4; mix-blend-mode: overlay;
+  }
+
+  /* ---------- Liquid glass ---------- */
+  .glass {
+    position: relative;
+    background: linear-gradient(135deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+    backdrop-filter: blur(12px) saturate(130%);
+    -webkit-backdrop-filter: blur(12px) saturate(130%);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.15) inset,
+      0 -1px 0 rgba(255,255,255,0.04) inset,
+      0 30px 60px -30px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(255,255,255,0.02);
+    overflow: hidden;
+    /* Promote to its own compositor layer so the blur is cached
+       and doesn't recompute while the page scrolls underneath. */
+    transform: translateZ(0);
+    will-change: transform;
+    contain: paint;
+    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 400ms ease,
+                box-shadow 400ms ease;
+  }
+  @media (max-width: 900px) {
+    /* Mobile fallback: drop backdrop-filter entirely — it's the single
+       most expensive per-frame op and phones can't afford it. */
+    .glass { backdrop-filter: none; -webkit-backdrop-filter: none;
+             background: linear-gradient(135deg, rgba(28,22,40,0.82), rgba(18,14,26,0.72)); }
+  }
+  .glass::before {
+    /* top highlight */
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 55%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .glass-hover::after {
+    /* shimmer sweep on hover — scoped to hover-capable panels only,
+       since mix-blend-mode forces an extra compositor pass. */
+    content: '';
+    position: absolute; inset: -1px;
+    background: linear-gradient(115deg,
+      transparent 30%,
+      rgba(255,255,255,0.15) 45%,
+      rgba(255,255,255,0.04) 50%,
+      transparent 65%);
+    transform: translateX(-120%);
+    transition: transform 1200ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    border-radius: inherit;
+    mix-blend-mode: overlay;
+    opacity: 0;
+  }
+  .glass-hover:hover::after { transform: translateX(120%); opacity: 1; }
+  .glass-hover:hover {
+    border-color: rgba(255,255,255,0.3);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.2) inset,
+      0 -1px 0 rgba(255,255,255,0.05) inset,
+      0 40px 80px -30px rgba(0,0,0,0.9),
+      0 0 0 1px rgba(255,255,255,0.05),
+      0 0 40px -5px rgba(95,240,255,0.18);
+  }
+  .glass-float {
+    animation: float 9s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+  }
+  .glass-ring {
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.15) inset,
+      0 0 0 1px rgba(255,255,255,0.05),
+      0 0 60px -10px rgba(255,77,210,0.25),
+      0 0 120px -30px rgba(95,240,255,0.3);
+  }
+
+  /* ---------- Layout ---------- */
+  .wrap { position: relative; z-index: 1; }
+  section {
+    position: relative;
+    padding: 140px 7vw;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  @media (max-width: 720px) {
+    section { padding: 80px 5vw; }
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+  }
+  h1, h2, h3 { font-weight: 400; margin: 0; }
+  .h-display {
+    font-size: clamp(48px, 8.2vw, 128px);
+    font-weight: 300;
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+  }
+  .h-section {
+    font-size: clamp(34px, 5vw, 68px);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    font-weight: 400;
+  }
+  .lede {
+    font-size: clamp(16px, 1.3vw, 20px);
+    color: rgba(255,255,255,0.72);
+    line-height: 1.5;
+    max-width: 620px;
+    text-wrap: pretty;
+  }
+
+  /* Nav */
+  nav.top {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 30;
+    padding: 18px 5vw;
+    display: flex; align-items: center; justify-content: space-between;
+    pointer-events: none;
+  }
+  nav.top > * { pointer-events: auto; }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; letter-spacing: 0.02em;
+  }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: conic-gradient(from 0deg, var(--accent-cyan), var(--accent-magenta), var(--accent-violet), var(--accent-cyan));
+    box-shadow: 0 0 16px -2px var(--accent-magenta), 0 0 4px rgba(255,255,255,0.4) inset;
+  }
+  nav.top .links {
+    display: flex; gap: 4px;
+    padding: 6px;
+    border-radius: 999px;
+  }
+  nav.top .links a {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    border-radius: 999px;
+    transition: background 200ms ease, color 200ms ease;
+  }
+  nav.top .links a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  @media (max-width: 780px) {
+    nav.top .links { display: none; }
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(8px);
+  }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 22px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: transform 300ms ease, box-shadow 300ms ease, background 300ms ease;
+  }
+  .btn-primary {
+    background: #fff; color: #000;
+    box-shadow: 0 10px 30px -10px rgba(255,255,255,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 40px -12px rgba(255,255,255,0.4); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.2);
+    color: #fff;
+    backdrop-filter: blur(12px);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.35); }
+
+  /* Placeholder stripes */
+  .placeholder {
+    background:
+      repeating-linear-gradient(135deg,
+        rgba(255,255,255,0.04) 0 12px,
+        rgba(255,255,255,0.01) 12px 24px);
+    border: 1px dashed rgba(255,255,255,0.14);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.4);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* Fade in on scroll */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 900ms ease, transform 900ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* Scroll progress bar */
+  .scroll-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 2px;
+    z-index: 40;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+    transform-origin: 0 0;
+    transform: scaleX(0);
+    box-shadow: 0 0 20px var(--accent-magenta);
+  }
+
+  /* Scroll hint */
+  .scroll-hint {
+    position: absolute; bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.3em;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .scroll-hint .line {
+    width: 1px; height: 50px;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation: drip 2.4s ease-in-out infinite;
+  }
+  @keyframes drip {
+    0%   { transform: scaleY(0); transform-origin: 0 0; }
+    50%  { transform: scaleY(1); transform-origin: 0 0; }
+    51%  { transform: scaleY(1); transform-origin: 0 100%; }
+    100% { transform: scaleY(0); transform-origin: 0 100%; }
+  }
+
+  /* Tagline chip on hero */
+  .chip-stack {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .chip {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(14px);
+  }
+</style>
+</head>
+<body data-screen-label="Portfolio — Neurogrid">
+
+<canvas id="neon-city"></canvas>
+<div class="scroll-bar" id="scrollBar"></div>
+
+<div class="wrap">
+
+<nav class="top">
+  <div class="brand glass" style="padding: 10px 16px; border-radius: 999px;">
+    <span class="brand-mark"></span>
+    <span>Neuro-grid · <span style="color:var(--muted)">Resilient Energy Intelligence</span></span>
+  </div>
+  <div class="links glass">
+    <a href="#challenge">Challenge</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#defense">Defense</a>
+    <a href="#stack">Stack</a>
+  </div>
+  <a href="#stack" class="pill" style="pointer-events:auto">
+    <span class="dot"></span> Vision 2030 · KSA
+  </a>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section id="hero" style="min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 140px;" data-screen-label="01 Hero">
+  <div style="max-width: 1100px;">
+    <div class="pill reveal" style="margin-bottom: 28px;">
+      <span class="dot" style="background: var(--accent-magenta); box-shadow: 0 0 10px var(--accent-magenta);"></span>
+      <span class="mono" style="letter-spacing:0.2em;">CASE STUDY · HEAPO · 86.2M ROWS</span>
+    </div>
+    <h1 class="h-display reveal">
+      The grid is <span style="color: var(--accent-cyan); text-shadow: 0 0 40px rgba(95,240,255,0.4);">thinking</span><br/>
+      with memory <span style="font-style: italic; font-weight: 300; color: rgba(255,255,255,0.7);">&amp;</span> intent.
+    </h1>
+    <p class="lede reveal" style="margin-top: 32px;">
+      A Spark-native, federated AI blueprint for Saudi Vision 2030 smart cities. Nearly 1,400 households, 86.2 million power readings, 15 distributed agents — trained without data ever leaving home, defended against Byzantine attacks at line speed.
+    </p>
+
+    <div class="reveal" style="margin-top: 40px; display: flex; gap: 14px; flex-wrap: wrap;">
+      <a href="#pipeline" class="btn btn-primary">See the pipeline <span style="font-family:monospace;">→</span></a>
+      <a href="#defense" class="btn btn-ghost glass-hover">How we defend it</a>
+    </div>
+  </div>
+
+  <!-- Floating glass tag on the right -->
+  <div style="position: absolute; right: 7vw; bottom: 30vh; max-width: 300px;" class="reveal hide-mobile">
+    <div class="glass glass-float glass-ring" style="padding: 22px;">
+      <div class="eyebrow" style="margin-bottom: 10px;">Stack pillars</div>
+      <div style="font-size: 22px; line-height: 1.25; letter-spacing: -0.02em; font-weight: 300;">
+        Apache Spark. Federated learning. Multi-Krum defense.
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <span>SCROLL</span>
+    <span class="line"></span>
+  </div>
+</section>
+
+<!-- ========== CHALLENGE ========== -->
+<section id="challenge" data-screen-label="02 Challenge">
+  <div style="display: grid; grid-template-columns: 1fr; gap: 40px;" class="about-grid">
+    <div>
+      <div class="eyebrow reveal" style="margin-bottom: 20px;">01 — The Big Data Challenge</div>
+      <h2 class="h-section reveal">
+        86.2&nbsp;million rows.<br/>
+        <span style="color: var(--accent-magenta)">Pandas would crash.</span>
+      </h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; align-items: start;">
+      <div class="reveal" style="grid-column: span 7 / span 7;">
+        <p class="lede" style="max-width: none;">
+          We start with the <strong>HEAPO dataset</strong> — nearly 1,400 households streaming a power reading every 15 minutes. That is roughly 86.2 million rows of raw consumption data. Loaded into a single-machine tool, the kernel runs out of memory and dies before the first chart renders.
+        </p>
+        <p class="lede" style="max-width: none; margin-top: 20px;">
+          So the system is built on <strong>Apache Spark</strong> from the ground up. Spark acts as a manager: it shards the dataset into small partitions and farms them out to a team of workers that process in parallel. This is <em>horizontal scalability</em> — we add workers, not bigger machines, and the pipeline keeps up.
+        </p>
+      </div>
+      <div class="reveal glass glass-hover" style="grid-column: span 5 / span 5; padding: 30px;">
+        <div class="eyebrow" style="margin-bottom: 18px;">At a glance</div>
+        <div style="display: grid; gap: 18px;">
+          <div>
+            <div style="font-size: 20px; letter-spacing:-0.02em;">~1,400 households · <span style="color: var(--muted)">HEAPO corpus</span></div>
+            <div class="mono" style="font-size: 12px; color: var(--faint); margin-top: 4px;">15-MINUTE INTERVAL · MULTI-YEAR</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; letter-spacing:-0.02em;">86.2M rows · <span style="color: var(--muted)">distributed</span></div>
+            <div class="mono" style="font-size: 12px; color: var(--faint); margin-top: 4px;">SPARK PARTITIONS · WORKER POOL</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; letter-spacing:-0.02em;">15 federated agents · <span style="color: var(--muted)">one per house</span></div>
+            <div class="mono" style="font-size: 12px; color: var(--faint); margin-top: 4px;">RDDs · mapPartitions · privacy-preserving</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- stat strip — real numbers from the case study -->
+  <div class="reveal" style="margin-top: 80px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 32px 0;">
+    <div class="stat"><div class="stat-n">91.2%</div><div class="stat-l">Final model accuracy</div></div>
+    <div class="stat"><div class="stat-n">+11%</div><div class="stat-l">Recall on energy peaks</div></div>
+    <div class="stat"><div class="stat-n">1.7×</div><div class="stat-l">Faster than gRPC baseline</div></div>
+    <div class="stat"><div class="stat-n">80%</div><div class="stat-l">Honest-update acceptance</div></div>
+  </div>
+</section>
+
+<style>
+  .stat { padding: 0 24px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .stat:first-child { border-left: 0; padding-left: 0; }
+  .stat-n { font-size: clamp(28px, 3.5vw, 48px); font-weight: 300; letter-spacing: -0.04em; }
+  .stat-l { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.2em; margin-top: 6px; }
+  @media (max-width: 780px) {
+    .stat { padding: 12px 14px; }
+    #about .about-grid { gap: 24px; }
+    #about [style*="grid-column: span 7"] { grid-column: span 12 / span 12 !important; }
+    #about [style*="grid-column: span 5"] { grid-column: span 12 / span 12 !important; }
+    .hide-mobile { display: none; }
+  }
+</style>
+
+<!-- ========== PIPELINE / 4 PHASES ========== -->
+<section id="pipeline" data-screen-label="03 Pipeline">
+  <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 60px; flex-wrap: wrap; gap: 24px;">
+    <div>
+      <div class="eyebrow reveal" style="margin-bottom: 18px;">02 — Selected work</div>
+      <h2 class="h-section reveal">Four phases,<br/>one resilient pipeline.</h2>
+    </div>
+    <p class="lede reveal" style="max-width: 420px;">From raw HEAPO readings to a fault-tolerant federated agent grid — each phase solves a hard distributed-systems problem.</p>
+  </div>
+
+  <!-- Featured: ISMC summary card -->
+  <div class="reveal glass glass-hover" style="padding: 0; margin-bottom: 32px; display: grid; grid-template-columns: 5fr 4fr; gap: 0; overflow: hidden;" id="featured-project">
+    <div style="padding: 48px; display: flex; flex-direction: column; justify-content: space-between; min-height: 520px;">
+      <div>
+        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 18px;">
+          <span class="eyebrow">The Journey · Live</span>
+          <span class="mono" style="font-size: 10px; color: var(--accent-cyan); letter-spacing: 0.2em; padding: 3px 8px; border: 1px solid rgba(95,240,255,0.4); border-radius: 3px;">VISION 2030</span>
+        </div>
+        <h3 class="h-section" style="font-size: clamp(32px, 4.2vw, 56px);">
+          Raw data <span style="color: rgba(255,255,255,0.55); font-weight: 300;">→</span> intelligence<br/>
+          <span style="color: rgba(255,255,255,0.55); font-size: 0.55em; letter-spacing: -0.02em; font-weight: 300;">A blueprint for the smart cities of the future.</span>
+        </h3>
+      </div>
+      <div>
+        <p style="color: rgba(255,255,255,0.72); line-height: 1.6; max-width: 480px;">
+          15 federated agents, one per house. Spark RDDs send the model <em>to</em> the data — never the other way. Each worker trains locally and ships only the lessons learned. Multi-Krum throws out the poisoned ones.
+        </p>
+        <div class="chip-stack" style="margin-top: 24px;">
+          <span class="chip">Apache Spark</span>
+          <span class="chip">MLlib KMeans</span>
+          <span class="chip">RDD mapPartitions</span>
+          <span class="chip">Multi-Krum</span>
+        </div>
+      </div>
+    </div>
+    <div style="position: relative; border-left: 1px solid rgba(255,255,255,0.08); padding: 32px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="eyebrow" style="color: var(--muted);">Pipeline loop</div>
+      <div id="ismc-diagram" style="flex: 1; position: relative; min-height: 220px;">
+      </div>
+      <div class="mono" style="font-size: 11px; color: var(--faint); line-height: 1.8;">
+        <div><span style="color: var(--accent-cyan);">P1</span> · preprocess &nbsp; <span style="color: var(--accent-magenta);">P2</span> · cluster</div>
+        <div><span style="color: var(--accent-violet);">P3</span> · federate &nbsp; <span style="color: var(--accent-red);">P4</span> · defend</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
+        <div style="padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+          <div class="mono" style="font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">ACCURACY</div>
+          <div style="font-size: 28px; font-weight: 300; letter-spacing: -0.04em;">91.2%</div>
+        </div>
+        <div style="padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+          <div class="mono" style="font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px;">SPEEDUP</div>
+          <div style="font-size: 28px; font-weight: 300; letter-spacing: -0.04em;">1.7×</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 phase cards -->
+  <div id="project-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+
+    <article class="reveal glass glass-hover proj" style="padding: 36px; min-height: 360px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px;">
+          <span style="font-size: 44px; font-weight: 300; color: var(--accent-cyan); letter-spacing: -0.04em;">01</span>
+          <div class="eyebrow">Phase 1 · Preprocessing</div>
+        </div>
+        <h3 style="font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.03em; line-height: 1.05;">A 3-tier safety net for missing data.</h3>
+        <p style="color: rgba(255,255,255,0.7); margin-top: 14px; line-height: 1.6;">
+          Cast types, group into 15-minute windows, and align hourly weather to quarter-hour power readings via a <em>broadcast join</em>. When a sensor drops out: rolling average → household mean → zero-fill.
+        </p>
+      </div>
+      <div class="chip-stack" style="margin-top: 18px;"><span class="chip">Spark SQL</span><span class="chip">Broadcast join</span><span class="chip">Weather fusion</span></div>
+    </article>
+
+    <article class="reveal glass glass-hover proj" style="padding: 36px; min-height: 360px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px;">
+          <span style="font-size: 44px; font-weight: 300; color: var(--accent-magenta); letter-spacing: -0.04em;">02</span>
+          <div class="eyebrow">Phase 2 · Clustering</div>
+        </div>
+        <h3 style="font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.03em; line-height: 1.05;">Stratified samples, not random ones.</h3>
+        <p style="color: rgba(255,255,255,0.7); margin-top: 14px; line-height: 1.6;">
+          Spark MLlib KMeans groups all 1,400 households into consumption profiles — heavy industrial, light residential, and everything between. We sample proportionally so the agents learn the whole population, not a slice of it.
+        </p>
+      </div>
+      <div class="chip-stack" style="margin-top: 18px;"><span class="chip">MLlib KMeans</span><span class="chip">Stratified sample</span><span class="chip">Generalization</span></div>
+    </article>
+
+    <article class="reveal glass glass-hover proj" style="padding: 36px; min-height: 360px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px;">
+          <span style="font-size: 44px; font-weight: 300; color: var(--accent-violet); letter-spacing: -0.04em;">03</span>
+          <div class="eyebrow">Phase 3 · Federated Learning</div>
+        </div>
+        <h3 style="font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.03em; line-height: 1.05;">Send the model to the data.</h3>
+        <p style="color: rgba(255,255,255,0.7); margin-top: 14px; line-height: 1.6;">
+          15 agents, one per house, trained simultaneously via Spark RDDs and <span class="mono">mapPartitions</span>. Each worker trains on its private data; only model updates leave the building. Privacy by construction.
+        </p>
+      </div>
+      <div class="chip-stack" style="margin-top: 18px;"><span class="chip">RDD</span><span class="chip">mapPartitions</span><span class="chip">Federated</span></div>
+    </article>
+
+    <article class="reveal glass glass-hover proj" style="padding: 36px; min-height: 360px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px;">
+          <span style="font-size: 44px; font-weight: 300; color: var(--accent-red); letter-spacing: -0.04em;">04</span>
+          <div class="eyebrow">Phase 4 · Byzantine Defense</div>
+        </div>
+        <h3 style="font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -0.03em; line-height: 1.05;">Multi-Krum throws out the poison.</h3>
+        <p style="color: rgba(255,255,255,0.7); margin-top: 14px; line-height: 1.6;">
+          We assume 20% of agents may be compromised. Multi-Krum measures the geometric distance between updates; outliers get rejected. In simulation: malicious updates filtered, 80% of honest updates accepted.
+        </p>
+      </div>
+      <div class="chip-stack" style="margin-top: 18px;"><span class="chip">Multi-Krum</span><span class="chip">20% attack sim</span><span class="chip">Fault-tolerant</span></div>
+    </article>
+
+  </div>
+</section>
+
+<style>
+  @media (max-width: 900px) {
+    #featured-project { grid-template-columns: 1fr !important; }
+    #featured-project > div:last-child { border-left: 0; border-top: 1px solid rgba(255,255,255,0.08); }
+    #project-grid { grid-template-columns: 1fr !important; }
+    #project-grid .proj { grid-column: auto !important; }
+  }
+</style>
+
+<!-- ========== DEFENSE / RESULTS ========== -->
+<section id="defense" data-screen-label="04 Defense">
+  <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 60px; flex-wrap: wrap; gap: 24px;">
+    <div>
+      <div class="eyebrow reveal" style="margin-bottom: 18px;">03 — Defending against attacks</div>
+      <h2 class="h-section reveal">Assume the worst.<br/>Filter the rest.</h2>
+    </div>
+    <p class="lede reveal" style="max-width: 420px;">
+      A real grid will be probed, hacked, and degraded. Multi-Krum keeps the federated model honest even when 20% of nodes lie.
+    </p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 5fr 4fr; gap: 24px;" id="defense-grid">
+    <!-- Multi-Krum visual -->
+    <div class="reveal glass glass-hover" style="padding: 36px; min-height: 380px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div class="eyebrow" style="margin-bottom: 14px;">Multi-Krum filter · simulation</div>
+        <h3 style="font-size: clamp(24px, 2.4vw, 32px); letter-spacing: -0.03em; line-height: 1.1;">Geometric distance reveals the liars.</h3>
+        <p style="color: rgba(255,255,255,0.7); margin-top: 14px; line-height: 1.6;">
+          For every round, each agent's update is scored by its distance to its closest neighbors. Updates that drift too far from the honest cluster are rejected before they reach the global model.
+        </p>
+      </div>
+      <!-- inline scatter visual -->
+      <svg viewBox="0 0 400 160" style="width: 100%; height: auto; margin-top: 22px;">
+        <defs>
+          <radialGradient id="honest" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#5ff0ff" stop-opacity="0.9"/><stop offset="100%" stop-color="#5ff0ff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="poison" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ff5577" stop-opacity="0.9"/><stop offset="100%" stop-color="#ff5577" stop-opacity="0"/></radialGradient>
+        </defs>
+        <!-- honest cluster -->
+        <circle cx="160" cy="80" r="70" fill="url(#honest)" opacity="0.35"/>
+        <g fill="#5ff0ff">
+          <circle cx="140" cy="70" r="3"/><circle cx="170" cy="60" r="3"/><circle cx="180" cy="95" r="3"/>
+          <circle cx="150" cy="100" r="3"/><circle cx="165" cy="82" r="3"/><circle cx="190" cy="75" r="3"/>
+          <circle cx="135" cy="90" r="3"/><circle cx="175" cy="110" r="3"/><circle cx="155" cy="55" r="3"/>
+          <circle cx="195" cy="100" r="3"/><circle cx="145" cy="115" r="3"/><circle cx="205" cy="85" r="3"/>
+        </g>
+        <!-- poisoned outliers -->
+        <g fill="#ff5577">
+          <circle cx="320" cy="30" r="4"/><circle cx="350" cy="130" r="4"/><circle cx="60" cy="40" r="4"/>
+        </g>
+        <!-- rejection ring around outliers -->
+        <circle cx="320" cy="30" r="12" fill="none" stroke="#ff5577" stroke-dasharray="3 3" opacity="0.7"/>
+        <circle cx="350" cy="130" r="12" fill="none" stroke="#ff5577" stroke-dasharray="3 3" opacity="0.7"/>
+        <circle cx="60" cy="40" r="12" fill="none" stroke="#ff5577" stroke-dasharray="3 3" opacity="0.7"/>
+        <text x="320" y="22" fill="rgba(255,255,255,0.6)" font-size="9" font-family="JetBrains Mono" text-anchor="middle">REJECTED</text>
+        <text x="165" y="150" fill="rgba(255,255,255,0.6)" font-size="9" font-family="JetBrains Mono" text-anchor="middle">HONEST CLUSTER</text>
+      </svg>
+    </div>
+
+    <!-- Results column -->
+    <div style="display: grid; gap: 16px;">
+      <div class="reveal glass glass-hover" style="padding: 28px;">
+        <div class="eyebrow" style="margin-bottom: 8px;">Final accuracy</div>
+        <div style="font-size: 56px; font-weight: 300; letter-spacing: -0.05em; color: var(--accent-cyan);">91.2%</div>
+        <div style="color: rgba(255,255,255,0.65); margin-top: 6px;">Federated, after Multi-Krum filtering.</div>
+      </div>
+      <div class="reveal glass glass-hover" style="padding: 28px;">
+        <div class="eyebrow" style="margin-bottom: 8px;">Recall on energy peaks</div>
+        <div style="font-size: 56px; font-weight: 300; letter-spacing: -0.05em; color: var(--accent-magenta);">+11%</div>
+        <div style="color: rgba(255,255,255,0.65); margin-top: 6px;">Catches surges before they happen.</div>
+      </div>
+      <div class="reveal glass glass-hover" style="padding: 28px;">
+        <div class="eyebrow" style="margin-bottom: 8px;">Spark vs. gRPC at scale</div>
+        <div style="font-size: 56px; font-weight: 300; letter-spacing: -0.05em; color: var(--accent-violet);">1.7×</div>
+        <div style="color: rgba(255,255,255,0.65); margin-top: 6px;">Faster as agent count grows. Horizontal scaling wins.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  @media (max-width: 900px) {
+    #defense-grid { grid-template-columns: 1fr !important; }
+  }
+</style>
+
+<!-- ========== STACK ========== -->
+<section id="stack" data-screen-label="04 Stack">
+  <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 60px; flex-wrap: wrap; gap: 24px;">
+    <div>
+      <div class="eyebrow reveal" style="margin-bottom: 18px;">04 — Tech stack</div>
+      <h2 class="h-section reveal">Opinionated.<br/>Production-grade.</h2>
+    </div>
+    <p class="lede reveal" style="max-width: 420px;">Every tool picked for a reason. No frameworks for the sake of frameworks.</p>
+  </div>
+
+  <div id="stack-grid" class="reveal" style="display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 140px; gap: 16px;">
+    <div class="glass glass-hover stack-big" style="grid-column: span 3; grid-row: span 2; padding: 30px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Distributed Engine</div>
+      <div>
+        <div style="font-size: clamp(32px, 3.4vw, 48px); letter-spacing: -0.04em; font-weight: 300; margin-bottom: 6px;">Apache Spark</div>
+        <div style="color: rgba(255,255,255,0.7);">RDD <span class="mono" style="color: var(--accent-cyan);">mapPartitions</span> · Broadcast joins · Stratified sampling. The engine that lets every house train in parallel.</div>
+      </div>
+    </div>
+    <div class="glass glass-hover" style="grid-column: span 3; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Clustering</div>
+      <div style="font-size: clamp(20px, 2vw, 28px); letter-spacing: -0.03em; font-weight: 300;">MLlib KMeans</div>
+    </div>
+    <div class="glass glass-hover" style="grid-column: span 3; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Language</div>
+      <div style="font-size: clamp(20px, 2vw, 28px); letter-spacing: -0.03em; font-weight: 300;">PySpark · Python 3.11</div>
+    </div>
+    <div class="glass glass-hover" style="grid-column: span 2; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Defense</div>
+      <div style="font-size: clamp(18px, 1.6vw, 22px); letter-spacing: -0.02em; font-weight: 300;">Multi-Krum</div>
+    </div>
+    <div class="glass glass-hover" style="grid-column: span 2; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Dataset</div>
+      <div style="font-size: clamp(18px, 1.6vw, 22px); letter-spacing: -0.02em; font-weight: 300;">HEAPO · 1,400 homes</div>
+    </div>
+    <div class="glass glass-hover" style="grid-column: span 2; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="eyebrow">Federation</div>
+      <div style="font-size: clamp(18px, 1.6vw, 22px); letter-spacing: -0.02em; font-weight: 300;">15 RDD agents</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== GLOSSARY / CHEAT SHEET ========== -->
+<section id="glossary-section" data-screen-label="05 Glossary">
+  <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 60px; flex-wrap: wrap; gap: 24px;">
+    <div>
+      <div class="eyebrow reveal" style="margin-bottom: 18px;">05 — Cheat sheet</div>
+      <h2 class="h-section reveal">Six terms,<br/>plain English.</h2>
+    </div>
+    <p class="lede reveal" style="max-width: 420px;">If you skipped the jargon, start here. Everything the pipeline depends on, defined without hand-waving.</p>
+  </div>
+
+  <div id="glossary" class="reveal" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-cyan); letter-spacing: 0.2em; text-transform: uppercase;">01 · Scaling</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Horizontal scaling</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">Add more machines, not bigger ones. A 16-core laptop hits a wall at 86&nbsp;million rows; a Spark cluster shrugs.</p>
+    </div>
+
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-magenta); letter-spacing: 0.2em; text-transform: uppercase;">02 · Joins</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Broadcast join</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">Ship the small table (weather, ~24 rows/day) to every worker once. Skip the network shuffle. Hourly weather meets quarter-hour power readings without the cluster groaning.</p>
+    </div>
+
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-violet); letter-spacing: 0.2em; text-transform: uppercase;">03 · Sampling</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Stratified sampling</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">Sample proportionally from each cluster instead of uniformly at random. Heavy users and apartments both make the cut — agents learn the whole population, not the loudest slice.</p>
+    </div>
+
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-red); letter-spacing: 0.2em; text-transform: uppercase;">04 · Threat</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Byzantine attack</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">A compromised agent that <em>looks</em> cooperative but ships poisoned model updates. In federated learning the server can't see the data, so it can't tell honest from hostile by inspection.</p>
+    </div>
+
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-cyan); letter-spacing: 0.2em; text-transform: uppercase;">05 · Defense</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Multi-Krum</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">Each round, score every update by its distance to its nearest neighbours. Keep the closest <span class="mono" style="font-size: 13px;">n − f</span>; throw out the outliers. Survives up to <span class="mono" style="font-size: 13px;">f</span> traitors per round.</p>
+    </div>
+
+    <div class="glass glass-hover" style="padding: 28px; display: flex; flex-direction: column; gap: 12px; min-height: 200px;">
+      <div class="mono" style="font-size: 11px; color: var(--accent-magenta); letter-spacing: 0.2em; text-transform: uppercase;">06 · Metric</div>
+      <h3 style="font-size: 22px; letter-spacing: -0.02em; font-weight: 400;">Recall</h3>
+      <p style="color: rgba(255,255,255,0.7); line-height: 1.55; font-size: 14px;">Of the real attacks, how many did we catch? In a defensive system, recall matters more than accuracy — missing a Byzantine is worse than flagging an honest worker by mistake.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  @media (max-width: 780px) {
+    #stack-grid { grid-template-columns: repeat(2, 1fr) !important; grid-auto-rows: auto !important; }
+    #stack-grid > * { grid-column: span 2 !important; grid-row: auto !important; min-height: 120px; }
+    #glossary { grid-template-columns: 1fr !important; }
+  }
+</style>
+
+<!-- ========== FOOTER ========== -->
+<section id="footer" style="padding-bottom: 60px; padding-top: 60px;">
+  <footer style="padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; flex-wrap: wrap; gap: 16px;">
+    <span>© 2026 Neuro-grid · research blueprint</span>
+    <span class="mono">Built with &lt;canvas&gt; and federated learning</span>
+  </footer>
+</section>
+
+</div><!-- /.wrap -->
+
+<!-- Tweaks panel container -->
+<div id="tweaks-root"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script>
+/* ============================================================
+ *  NEON CITY — canvas2d, scroll-driven isometric neon grid
+ * ============================================================ */
+(function(){
+  const canvas = document.getElementById('neon-city');
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  // Tweakable defaults (live in window so Tweaks panel can read/write them)
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "palette": "Magenta / Cyan",
+    "intensity": 1,
+    "scrollSpeed": 1,
+    "glassOpacity": 0.06,
+    "pulseSpeed": 1,
+    "dense": true,
+    "showScanline": true
+  }/*EDITMODE-END*/;
+
+  window.__neuro = Object.assign({}, TWEAK_DEFAULTS);
+
+  const PALETTES = {
+    'Magenta / Cyan': { a: '#5ff0ff', b: '#ff4dd2', c: '#ff5577', ambient: 'rgba(80,10,60,0.35)' },
+    'Blue / Violet':  { a: '#4ab3ff', b: '#9a7cff', c: '#ff6fa3', ambient: 'rgba(30,20,80,0.4)' },
+    'Solar Red':      { a: '#ffb066', b: '#ff4060', c: '#ffffff', ambient: 'rgba(80,20,10,0.35)' },
+    'Mono Chrome':    { a: '#ffffff', b: '#9aa6b2', c: '#d0d0d8', ambient: 'rgba(20,20,30,0.5)' }
+  };
+
+  // Cap DPR hard. Retina at 2x quadruples fill cost for barely-visible gain
+  // on a background animation — 1.1 is plenty.
+  let DPR = Math.min(window.devicePixelRatio || 1, 1.1);
+  let W = 0, H = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 1.1);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildGlowSprites();
+  }
+
+  /* Pre-rendered radial glow sprites — replaces shadowBlur, which is
+     the single most expensive 2D canvas op and was being set per shape. */
+  const glowSprites = {};
+  function buildGlowSprites() {
+    const colors = ['#5ff0ff','#ff4dd2','#ff5577','#9a7cff','#ffffff','#ffb066','#4ab3ff','#9aa6b2','#d0d0d8'];
+    for (const c of colors) {
+      const size = 48;
+      const oc = document.createElement('canvas');
+      oc.width = size; oc.height = size;
+      const octx = oc.getContext('2d');
+      const g = octx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      g.addColorStop(0, c);
+      g.addColorStop(0.25, c + 'cc');
+      g.addColorStop(0.6, hexToRgba(c, 0.18));
+      g.addColorStop(1, hexToRgba(c, 0));
+      octx.fillStyle = g;
+      octx.fillRect(0, 0, size, size);
+      glowSprites[c] = oc;
+    }
+  }
+  function hexToRgba(hex, a) {
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16);
+    const g = parseInt(h.substring(2,4),16);
+    const b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  function drawGlow(x, y, radius, color, alpha) {
+    const sprite = glowSprites[color] || glowSprites['#ffffff'];
+    if (!sprite) return;
+    ctx.globalAlpha = alpha;
+    const d = radius * 2;
+    ctx.drawImage(sprite, x - radius, y - radius, d, d);
+    ctx.globalAlpha = 1;
+  }
+
+  resize();
+  window.addEventListener('resize', resize, { passive: true });
+
+  // Pause when the canvas is off-screen (user deep on the page) or tab hidden.
+  let visible = true;
+  const visIO = new IntersectionObserver((entries) => {
+    for (const e of entries) visible = e.isIntersecting;
+  });
+  visIO.observe(canvas);
+  document.addEventListener('visibilitychange', () => {
+    visible = !document.hidden && visible;
+  });
+
+  /* ----- City generation (deterministic) ----- */
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(20260424);
+
+  // Grid: 22 x 22 cells; each cell is either building (with height) or empty (park/road)
+  const GRID = 22;
+  const CELL = 46;          // base cell size in world units
+  const cells = [];         // { x, y, h, type: 'bldg'|'park'|'plaza' }
+  const streetsH = new Set(); // rows that are streets
+  const streetsV = new Set(); // cols that are streets
+
+  // Streets on every 4th row/col
+  for (let i = 0; i < GRID; i++) if (i % 4 === 3) { streetsH.add(i); streetsV.add(i); }
+
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const onStreet = streetsH.has(y) || streetsV.has(x);
+      if (onStreet) {
+        cells.push({ x, y, h: 0, type: 'road' });
+        continue;
+      }
+      const parkRoll = rng();
+      if (parkRoll < 0.1) {
+        cells.push({ x, y, h: 4 + rng()*4, type: 'park' });
+      } else {
+        // building height — cluster tall toward center
+        const dx = (x - GRID/2) / (GRID/2);
+        const dy = (y - GRID/2) / (GRID/2);
+        const d = Math.sqrt(dx*dx + dy*dy);
+        const base = 18 + rng()*60;
+        const densityBoost = (1 - Math.min(d, 1)) * 70;
+        cells.push({ x, y, h: base + densityBoost * (0.6 + rng()*0.4), type: 'bldg', seed: rng() });
+      }
+    }
+  }
+
+  // Pulses along streets (moving dots of light)
+  const pulses = [];
+  function spawnPulses() {
+    pulses.length = 0;
+    const isMobile = window.innerWidth < 780;
+    const base = window.__neuro.dense ? 36 : 18;
+    const N = isMobile ? Math.floor(base * 0.5) : base;
+    for (let i = 0; i < N; i++) {
+      const horizontal = rng() > 0.5;
+      pulses.push({
+        horizontal,
+        track: horizontal ? [...streetsH][Math.floor(rng()*streetsH.size)]
+                          : [...streetsV][Math.floor(rng()*streetsV.size)],
+        pos: rng() * GRID,
+        speed: 0.4 + rng() * 1.6,
+        dir: rng() > 0.5 ? 1 : -1,
+        colorIx: Math.floor(rng() * 3),
+        size: 0.6 + rng() * 0.6
+      });
+    }
+  }
+  spawnPulses();
+
+  /* ----- Iso projection ----- */
+  // World (gx, gy, gz) -> screen (sx, sy), with camera pan/zoom from scroll.
+  // gx, gy are in cell units; gz in world-height units.
+  function project(gx, gy, gz, cam) {
+    // Center on grid center
+    const cx = GRID / 2;
+    const cy = GRID / 2;
+    const x = (gx - cx) * CELL;
+    const y = (gy - cy) * CELL;
+    // Isometric: sx = (x - y) * cos30; sy = (x + y) * sin30 - gz
+    const cos30 = 0.866, sin30 = 0.5;
+    const isoX = (x - y) * cos30;
+    const isoY = (x + y) * sin30 * 0.62 - gz;
+    return {
+      x: W/2 + cam.panX + isoX * cam.zoom,
+      y: H/2 + cam.panY + isoY * cam.zoom
+    };
+  }
+
+  /* ----- Draw ----- */
+  let scrollY = 0;
+  let targetScrollY = 0;
+  let t = 0;
+  let last = performance.now();
+  let lastRender = 0;
+  const FRAME_MS = 1000 / 40; // target 40fps for the bg; plenty for ambience
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+
+    // Always update the scroll bar — it's cheap and needs to stay in sync.
+    const doc = document.documentElement;
+    const maxScroll = Math.max(1, doc.scrollHeight - window.innerHeight);
+    const pct = Math.min(1, window.scrollY / maxScroll);
+    const bar = document.getElementById('scrollBar');
+    if (bar) bar.style.transform = `scaleX(${pct})`;
+
+    if (!visible) { last = now; return; }
+    if (now - lastRender < FRAME_MS) return;
+    const dt = Math.min(now - last, 60);
+    last = now;
+    lastRender = now;
+    t += dt * 0.001 * (window.__neuro.pulseSpeed || 1);
+
+    // Smoothly lerp scroll for buttery camera
+    targetScrollY = window.scrollY * (window.__neuro.scrollSpeed || 1);
+    scrollY += (targetScrollY - scrollY) * 0.12;
+
+    render();
+  }
+
+  function render() {
+    // Clear with near-black
+    ctx.clearRect(0, 0, W, H);
+
+    // Ambient wash
+    const pal = PALETTES[window.__neuro.palette] || PALETTES['Magenta / Cyan'];
+    const grad = ctx.createRadialGradient(W*0.5, H*0.55, 0, W*0.5, H*0.55, Math.max(W, H) * 0.75);
+    grad.addColorStop(0, pal.ambient);
+    grad.addColorStop(1, 'rgba(4,4,10,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Camera params derived from scrollY (normalized)
+    const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const s = scrollY / maxScroll; // 0..1
+    const cam = {
+      panX: Math.sin(s * Math.PI * 0.6) * 60,
+      panY: H * 0.12 + s * H * 0.55, // city sinks as you scroll
+      zoom: 0.75 + s * 0.7 + Math.sin(t * 0.2) * 0.01
+    };
+
+    // Horizon glow
+    ctx.save();
+    const horizY = H * (0.55 - s * 0.1);
+    const hg = ctx.createLinearGradient(0, horizY - 150, 0, horizY + 150);
+    hg.addColorStop(0, 'rgba(0,0,0,0)');
+    hg.addColorStop(0.5, hexA(pal.b, 0.12 * intensity()));
+    hg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, horizY - 150, W, 300);
+    ctx.restore();
+
+    // Draw cells back-to-front (by gx+gy descending)
+    // For iso, larger (x+y) is in front; we want to paint back first.
+    const sorted = cells.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
+
+    // Base ground plane tiles (roads get neon lines)
+    for (const c of sorted) {
+      drawGroundTile(c, cam, pal);
+    }
+
+    // Buildings (back to front)
+    for (const c of sorted) {
+      if (c.type === 'bldg') drawBuilding(c, cam, pal);
+      else if (c.type === 'park') drawPark(c, cam, pal);
+    }
+
+    // Pulses on streets
+    drawPulses(cam, pal);
+
+    // Foreground glow / vignette
+    ctx.save();
+    const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    // Scanline — pre-rendered once into a tile, blitted via pattern.
+    // (Old loop drew H/3 filled rects every frame — huge waste.)
+    if (window.__neuro.showScanline) {
+      if (!window.__scanPattern) {
+        const sc = document.createElement('canvas');
+        sc.width = 1; sc.height = 3;
+        const sctx = sc.getContext('2d');
+        sctx.fillStyle = 'rgba(255,255,255,0.08)';
+        sctx.fillRect(0, 0, 1, 1);
+        window.__scanPattern = ctx.createPattern(sc, 'repeat');
+      }
+      ctx.fillStyle = window.__scanPattern;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function intensity() { return window.__neuro.intensity || 1; }
+
+  function hexA(hex, a) {
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16);
+    const g = parseInt(h.substring(2,4),16);
+    const b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function drawGroundTile(c, cam, pal) {
+    const p0 = project(c.x,     c.y,     0, cam);
+    const p1 = project(c.x + 1, c.y,     0, cam);
+    const p2 = project(c.x + 1, c.y + 1, 0, cam);
+    const p3 = project(c.x,     c.y + 1, 0, cam);
+
+    if (c.type === 'road') {
+      // Street — dark with faint line
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(10,10,20,0.55)';
+      ctx.fill();
+      // Glowing centerline
+      const onH = streetsH.has(c.y);
+      const onV = streetsV.has(c.x);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = hexA(pal.a, 0.55 * intensity());
+      if (onH) {
+        // horizontal line across cell (along x-axis in world)
+        const a = project(c.x,     c.y + 0.5, 0, cam);
+        const b = project(c.x + 1, c.y + 0.5, 0, cam);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      if (onV) {
+        const a = project(c.x + 0.5, c.y,     0, cam);
+        const b = project(c.x + 0.5, c.y + 1, 0, cam);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // Block base — very dark
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(12,8,18,0.7)';
+      ctx.fill();
+    }
+  }
+
+  function drawBuilding(c, cam, pal) {
+    const h = c.h;
+    // pick color for this building
+    const hash = (c.x * 13 + c.y * 29) | 0;
+    const isPink = (hash % 3 === 0);
+    const isCyan = (hash % 5 === 0);
+    const edgeCol = isCyan ? pal.a : (isPink ? pal.b : pal.c);
+
+    // Building footprint — slightly inset
+    const inset = 0.12;
+    const x0 = c.x + inset, y0 = c.y + inset;
+    const x1 = c.x + 1 - inset, y1 = c.y + 1 - inset;
+
+    const b0 = project(x0, y0, 0, cam);
+    const b1 = project(x1, y0, 0, cam);
+    const b2 = project(x1, y1, 0, cam);
+    const b3 = project(x0, y1, 0, cam);
+    const t0 = project(x0, y0, h, cam);
+    const t1 = project(x1, y0, h, cam);
+    const t2 = project(x1, y1, h, cam);
+    const t3 = project(x0, y1, h, cam);
+
+    // Right face
+    ctx.beginPath();
+    ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y);
+    ctx.lineTo(t2.x, t2.y); ctx.lineTo(t1.x, t1.y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(20,6,24,0.75)';
+    ctx.fill();
+
+    // Left face
+    ctx.beginPath();
+    ctx.moveTo(b3.x, b3.y); ctx.lineTo(b2.x, b2.y);
+    ctx.lineTo(t2.x, t2.y); ctx.lineTo(t3.x, t3.y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(14,4,18,0.85)';
+    ctx.fill();
+
+    // Top face
+    ctx.beginPath();
+    ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y);
+    ctx.lineTo(t2.x, t2.y); ctx.lineTo(t3.x, t3.y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(30,12,40,0.9)';
+    ctx.fill();
+
+    // Neon edges
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = hexA(edgeCol, 0.85 * intensity());
+    ctx.lineWidth = 1;
+    // Vertical edges
+    ctx.beginPath();
+    ctx.moveTo(b1.x, b1.y); ctx.lineTo(t1.x, t1.y);
+    ctx.moveTo(b2.x, b2.y); ctx.lineTo(t2.x, t2.y);
+    ctx.moveTo(b3.x, b3.y); ctx.lineTo(t3.x, t3.y);
+    // Top rectangle
+    ctx.moveTo(t0.x, t0.y); ctx.lineTo(t1.x, t1.y);
+    ctx.lineTo(t2.x, t2.y); ctx.lineTo(t3.x, t3.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // Windows — faint dots on top face / sides
+    const seed = c.seed || 0;
+    if (seed > 0.4) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = hexA(edgeCol, 0.35 * intensity());
+      // couple of small random dots on the right face
+      const dots = 3 + Math.floor(seed * 4);
+      for (let i = 0; i < dots; i++) {
+        const u = (i * 0.17 + seed * 13) % 1;
+        const v = (i * 0.31 + seed * 7) % 1;
+        const p = project(
+          x1 - 0.01,
+          y0 + (y1 - y0) * (0.1 + u * 0.8),
+          (0.15 + v * 0.75) * h,
+          cam
+        );
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Rooftop beacon on tall buildings
+    if (h > 60) {
+      const rp = project((x0+x1)/2, (y0+y1)/2, h + 2, cam);
+      const pulse = 0.6 + Math.sin(t * 3 + c.x + c.y) * 0.4;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // glow halo via sprite
+      drawGlow(rp.x, rp.y, 10 * intensity(), pal.c, 0.6 * pulse * intensity());
+      ctx.fillStyle = hexA(pal.c, 0.9 * pulse * intensity());
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawPark(c, cam, pal) {
+    // Tiled plaza with a soft cyan glow and small "trees"
+    const p0 = project(c.x,     c.y,     0, cam);
+    const p1 = project(c.x + 1, c.y,     0, cam);
+    const p2 = project(c.x + 1, c.y + 1, 0, cam);
+    const p3 = project(c.x,     c.y + 1, 0, cam);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.lineTo(p3.x, p3.y);
+    ctx.closePath();
+    ctx.fillStyle = hexA(pal.a, 0.06 * intensity());
+    ctx.fill();
+
+    // Tree dots
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = hexA(pal.a, 0.7 * intensity());
+    for (let i = 0; i < 4; i++) {
+      const gx = c.x + 0.2 + ((i*0.37) % 0.6);
+      const gy = c.y + 0.2 + ((i*0.61) % 0.6);
+      const p = project(gx, gy, 3 + (i*1.3), cam);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPulses(cam, pal) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of pulses) {
+      p.pos += p.dir * p.speed * 0.015 * (window.__neuro.pulseSpeed || 1);
+      if (p.pos > GRID) p.pos = 0;
+      if (p.pos < 0) p.pos = GRID;
+
+      const col = [pal.a, pal.b, pal.c][p.colorIx];
+      let point;
+      if (p.horizontal) {
+        point = project(p.pos, p.track + 0.5, 0, cam);
+      } else {
+        point = project(p.track + 0.5, p.pos, 0, cam);
+      }
+      // glow halo via cheap sprite (replaces costly shadowBlur)
+      drawGlow(point.x, point.y, 10 * intensity() * p.size, col, 0.8 * intensity());
+      ctx.fillStyle = hexA(col, 1);
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, p.size * 1.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // trailing echo — just 2 steps, no glow sprite (cheap dots only)
+      for (let i = 1; i <= 2; i++) {
+        const pp = p.pos - p.dir * i * 0.4;
+        const pt = p.horizontal
+          ? project(pp, p.track + 0.5, 0, cam)
+          : project(p.track + 0.5, pp, 0, cam);
+        ctx.globalAlpha = (1 - i / 3) * 0.5;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, p.size * 1.0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  requestAnimationFrame(frame);
+
+  // Re-seed pulses when density toggles
+  window.__neuro_respawn = spawnPulses;
+})();
+
+/* ============================================================
+ *  REVEAL ON SCROLL
+ * ============================================================ */
+(function(){
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    }
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+})();
+
+/* ============================================================
+ *  ISMC tiny diagram (svg)
+ * ============================================================ */
+(function(){
+  const root = document.getElementById('ismc-diagram');
+  if (!root) return;
+  root.innerHTML = `
+    <svg viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
+      <defs>
+        <radialGradient id="nodeG" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <!-- loop path -->
+      <path d="M 60 110 C 60 40, 260 40, 260 110 C 260 180, 60 180, 60 110 Z"
+            fill="none" stroke="rgba(255,255,255,0.15)" stroke-dasharray="3 5"/>
+
+      <!-- nodes -->
+      <g>
+        <circle cx="60"  cy="110" r="28" fill="rgba(95,240,255,0.15)" stroke="#5ff0ff" stroke-width="1"/>
+        <text x="60" y="117" fill="#5ff0ff" font-family="JetBrains Mono" font-size="18" text-anchor="middle" font-weight="300">P1</text>
+
+        <circle cx="160" cy="40"  r="28" fill="rgba(255,77,210,0.15)" stroke="#ff4dd2" stroke-width="1"/>
+        <text x="160" y="47" fill="#ff4dd2" font-family="JetBrains Mono" font-size="18" text-anchor="middle" font-weight="300">P2</text>
+
+        <circle cx="260" cy="110" r="28" fill="rgba(154,124,255,0.15)" stroke="#9a7cff" stroke-width="1"/>
+        <text x="260" y="117" fill="#9a7cff" font-family="JetBrains Mono" font-size="18" text-anchor="middle" font-weight="300">P3</text>
+
+        <circle cx="160" cy="180" r="28" fill="rgba(255,85,119,0.15)" stroke="#ff5577" stroke-width="1"/>
+        <text x="160" y="187" fill="#ff5577" font-family="JetBrains Mono" font-size="18" text-anchor="middle" font-weight="300">P4</text>
+      </g>
+
+      <!-- traveling pulse -->
+      <circle r="3" fill="#fff">
+        <animateMotion dur="6s" repeatCount="indefinite"
+          path="M 60 110 C 60 40, 260 40, 260 110 C 260 180, 60 180, 60 110 Z"/>
+      </circle>
+    </svg>
+  `;
+})();
+
+/* ============================================================
+ *  Local time
+ * ============================================================ */
+(function(){
+  const el = document.getElementById('localTime');
+  if (!el) return;
+  function tick() {
+    const d = new Date();
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' });
+    el.textContent = time + ' AST';
+  }
+  tick(); setInterval(tick, 30_000);
+})();
+</script>
+
+<!-- React + Babel for Tweaks -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel">
+/* Tweaks panel — writes into window.__neuro so canvas picks it up next frame */
+const { useEffect } = React;
+
+function App() {
+  const [tweaks, setTweaks] = useTweaks(window.__neuro);
+
+  useEffect(() => {
+    Object.assign(window.__neuro, tweaks);
+    if (window.__neuro_respawn) window.__neuro_respawn();
+    // re-apply glass opacity as CSS var
+    document.documentElement.style.setProperty('--glass-tint',
+      `rgba(255,255,255,${tweaks.glassOpacity})`);
+  }, [tweaks]);
+
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection label="Atmosphere">
+        <TweakSelect label="Palette" value={tweaks.palette}
+          onChange={(v) => setTweaks({ palette: v })}
+          options={['Magenta / Cyan', 'Blue / Violet', 'Solar Red', 'Mono Chrome']} />
+        <TweakSlider label="Neon intensity" min={0.4} max={1.8} step={0.05}
+          value={tweaks.intensity}
+          onChange={(v) => setTweaks({ intensity: v })} />
+        <TweakToggle label="Scanlines" value={tweaks.showScanline}
+          onChange={(v) => setTweaks({ showScanline: v })} />
+      </TweakSection>
+
+      <TweakSection label="Motion">
+        <TweakSlider label="Scroll speed" min={0.2} max={2.5} step={0.05}
+          value={tweaks.scrollSpeed}
+          onChange={(v) => setTweaks({ scrollSpeed: v })} />
+        <TweakSlider label="Pulse speed" min={0.2} max={3} step={0.05}
+          value={tweaks.pulseSpeed}
+          onChange={(v) => setTweaks({ pulseSpeed: v })} />
+        <TweakToggle label="Dense traffic" value={tweaks.dense}
+          onChange={(v) => setTweaks({ dense: v })} />
+      </TweakSection>
+
+      <TweakSection label="Foreground">
+        <TweakSlider label="Glass tint" min={0.02} max={0.18} step={0.005}
+          value={tweaks.glassOpacity}
+          onChange={(v) => setTweaks({ glassOpacity: v })} />
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<App />);
+</script>
+
+</body>
+</html>
